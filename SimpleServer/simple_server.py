@@ -12,6 +12,7 @@ import copy
 from common import SafeFrame, SafeExiting
 from serversettings import *
 import colorsys
+import select
 
 # Objects for Multi-thread use
 current_frame = SafeFrame()
@@ -29,7 +30,8 @@ class Game:
 
     def new_game(self):
         # Start the listener
-        Thread(target=self.start_comms, args=[self]).start() #Create a thread that runs the function frame_grab while main runs in the current thread
+        t = Thread(target=self.start_comms, args=[self]) #, daemon=True
+        t.start() #Create a thread that runs the function 
 
     def update(self):
         self.delta_time = self.clock.tick(FPS)
@@ -64,7 +66,6 @@ class Game:
             self.check_events()
             self.update()
             self.draw()
-        # Shut down correctly
         pg.quit()
         sys.exit()
 
@@ -80,39 +81,48 @@ class Game:
 
         # Create a socket to listen on the specified port.
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         server_socket.bind(("localhost", LISTENING_PORT))
         server_socket.listen(1)
+        read_list = [server_socket]
+
         # Close the server socket when the program closes.
         atexit.register(server_socket.close)
 
         while not exiting.get():
-            # Any errors immediately close connection and
-            # recycle connection
-            try:
-                # Accept a connection from a client.
-                client_socket, client_address = server_socket.accept()
+            
+                # Check for a socket connecting via the 'select', if available
+                # then go ahead and accept(), otherwise recycle after 2 seconds
+                # (last parameter)
+                readable, writable, errored = select.select(read_list, [], [], 2)
+                for s in readable:
+                    if s is server_socket:
 
-                # Read the request from the client.
-                request = client_socket.recv(BUFFER_SIZE).decode("utf-8")
-                while not exiting.get() and len(request) > 0:
-                    # Parse the request.
-                    request_line = request.splitlines()[0]
-                    request_method, request_data = request_line.split(':')
+                        try:
+                            # Accept a connection from a client.
+                            client_socket, client_address = server_socket.accept()
 
-                    if request_method == 'frame':
-                        current_frame.set(request_data)
-                    elif request_method == 'quit':
-                        break
-                    else:
-                        break
-                    # Get next frame of data
-                    request = client_socket.recv(BUFFER_SIZE).decode("utf-8")
+                            # Read the request from the client.
+                            request = client_socket.recv(BUFFER_SIZE).decode("utf-8")
+                            while not exiting.get() and len(request) > 0:
+                                # Parse the request.
+                                request_line = request.splitlines()[0]
+                                request_method, request_data = request_line.split(':')
 
-            except Exception as e:
-                print("Comms Error: {}".format(e))
-            finally:
-                # Close the sockets.
-                client_socket.close()
+                                if request_method == 'frame':
+                                    current_frame.set(request_data)
+                                elif request_method == 'quit':
+                                    break
+                                else:
+                                    break
+                                # Get next frame of data
+                                request = client_socket.recv(BUFFER_SIZE).decode("utf-8")
+
+                        except Exception as e:
+                            print("Comms Error: {}".format(e))
+                        finally:
+                            # Close the sockets.
+                            client_socket.close()
 
 def main():
     game = Game()
