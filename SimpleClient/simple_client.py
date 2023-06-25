@@ -35,7 +35,7 @@ class Game:
     def new_game(self):
         # Start the listener
         if TRANSMIT:
-            Thread(target=self.start_comms, args=[self]).start() #Create a thread that runs the function frame_grab while main runs in the current thread
+            pass
 
     def update(self):
         global current_frame # global video image
@@ -137,47 +137,8 @@ class Game:
             self.draw()
         # Shut down correctly
         pg.quit()
-        sys.exit()
 
     ##### Communications #####
-    def start_comms(self, main):
-        global current_frame
-        global exiting
-
-        while not exiting.get():
-            try:
-
-                # Create a socket object
-                client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-
-                # Connect to the server
-                client_socket.connect((SERVER_ADDRESS, SERVER_PORT))
-
-                while True:
-                    # Loop until exiting is True
-                    # Sleep a little here
-                    for x in range(10):
-                        if exiting.get():
-                            raise Exception("Exiting")
-                        time.sleep(1.0/300.0)
-                    # Format data
-                    final_data = 'frame:'+''.join(current_frame.get())
-                    final_data = final_data.encode()
-
-                    # Send data
-                    client_socket.sendall(final_data)
-
-            except Exception as e:
-                print("COM Thread Ex: {}".format(e))
-            finally:
-                # Close the sockets.
-                client_socket.close()
-
-            # Wait a few seconds to recycle connection
-            for x in range(3):
-                if exiting.get():
-                    break
-                time.sleep(1.0)
 
     def hsv2rgb(self, h, s, v):
         return tuple(round(i * 255) for i in colorsys.hsv_to_rgb(h, s, v))

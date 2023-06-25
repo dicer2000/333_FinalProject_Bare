@@ -29,9 +29,7 @@ class Game:
         self.new_game()
 
     def new_game(self):
-        # Start the listener
-        t = Thread(target=self.start_comms, args=[self]) #, daemon=True
-        t.start() #Create a thread that runs the function 
+        pass
 
     def update(self):
         self.delta_time = self.clock.tick(FPS)
@@ -67,7 +65,6 @@ class Game:
             self.update()
             self.draw()
         pg.quit()
-        sys.exit()
 
     def text_display(self, char, x, y):
         text = self.font.render(str(char), True, WHITE)
@@ -75,54 +72,6 @@ class Game:
         text_rect = text.get_rect(center=(x, y))
         self.screen.blit(text, text_rect)
 
-    def start_comms(self, main):
-        global current_frame # global video image
-        global exiting # global exit program signal
-
-        # Create a socket to listen on the specified port.
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        server_socket.bind(("localhost", LISTENING_PORT))
-        server_socket.listen(1)
-        read_list = [server_socket]
-
-        # Close the server socket when the program closes.
-        atexit.register(server_socket.close)
-
-        while not exiting.get():
-            
-                # Check for a socket connecting via the 'select', if available
-                # then go ahead and accept(), otherwise recycle after 2 seconds
-                # (last parameter)
-                readable, writable, errored = select.select(read_list, [], [], 2)
-                for s in readable:
-                    if s is server_socket:
-
-                        try:
-                            # Accept a connection from a client.
-                            client_socket, client_address = server_socket.accept()
-
-                            # Read the request from the client.
-                            request = client_socket.recv(BUFFER_SIZE).decode("utf-8")
-                            while not exiting.get() and len(request) > 0:
-                                # Parse the request.
-                                request_line = request.splitlines()[0]
-                                request_method, request_data = request_line.split(':')
-
-                                if request_method == 'frame':
-                                    current_frame.set(request_data)
-                                elif request_method == 'quit':
-                                    break
-                                else:
-                                    break
-                                # Get next frame of data
-                                request = client_socket.recv(BUFFER_SIZE).decode("utf-8")
-
-                        except Exception as e:
-                            print("Comms Error: {}".format(e))
-                        finally:
-                            # Close the sockets.
-                            client_socket.close()
 
 def main():
     game = Game()
